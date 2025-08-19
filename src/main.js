@@ -1,113 +1,100 @@
 // Описаний у документації
 import iziToast from "izitoast";
-// Додатковий імпорт стилів
 import "izitoast/dist/css/iziToast.min.css";
 
-
-
 import { getImagesByQuery } from "./js/pixabay-api";
-import { createGallery, hideLoadMoreButton, showLoadMoreButton } from "./js/render-functions";
-import { showLoader } from "./js/render-functions";
-import { hideLoader } from "./js/render-functions";
-import { clearGallery } from "./js/render-functions";
-import { createMoreGallery } from "./js/render-functions";
-import { smoothScroll } from "./js/render-functions";
+import { 
+  createGallery, 
+  createMoreGallery,
+  clearGallery,
+  showLoadMoreButton, 
+  hideLoadMoreButton, 
+  showLoader, 
+  hideLoader, 
+  smoothScroll 
+} from "./js/render-functions";
 
+const form = document.querySelector('.form');
+const searchText = document.querySelector('[name="search-text"]');
+const buttonLoadMore = document.querySelector('.button-js');
 
-const form = document.querySelector('.form')
-const searchText = document.querySelector('[name="search-text"]')
-const buttonLoadMore = document.querySelector('.button-js')
 const per_page = 15;
-
-let totalHitsValue = ''
-let page = 1;
 let searchTextValue = '';
+let page = 1;
+let totalHitsValue = 0;
+let loadedImages = 0;
 
+// --- ПОШУК ---
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  searchTextValue = searchText.value.trim();
 
+  if (searchTextValue === '') {
+    iziToast.error({ message: 'Enter text, please!' });
+    return;
+  }
 
+  clearGallery();
+  page = 1;
+  loadedImages = 0;
+  hideLoadMoreButton();
+  showLoader();
 
+  try {
+    const { hits, totalHits } = await getImagesByQuery(searchTextValue, page);
+    totalHitsValue = totalHits;
 
-form.addEventListener('submit', (e)=>{
-    e.preventDefault();
-    searchTextValue = searchText.value.trim()
-    
-    console.log(searchText.value)
- if(searchText.value.trim() === ''){
-          iziToast.error({
-                message: 'enter text, please!',
-            })  
-          return
-        }
-    clearGallery()
-    showLoader()
-    page = 1;
-    async function getImagesFunction(searchTextValue, page) {
-      try {
-        const {hits, totalHits} = await getImagesByQuery(searchTextValue, page)
-        const totalPages = Math.ceil(totalHits / per_page)
-        if (hits.length === 0){
-            iziToast.error({
-                message: 'Sorry, there are no images matching your search query. Please try again!',
-            }) 
-            hideLoadMoreButton()
-            return
-            // ПЕРЕВІРКА PAGE
-        } else if (page >= totalPages){
-          iziToast.show({
-          message: 'Were sorry, but youve reached the end of search results.'
-          })
-          hideLoadMoreButton()
-          return
-          }
-        createGallery(hits)
-        showLoadMoreButton()
-        }
-      catch(err){
+    if (hits.length === 0) {
       iziToast.error({
-        message: 'Please try again later'
-      })
-      console.error(err)
+        message: 'Sorry, no images found. Please try again!'
+      });
+      return;
     }
-      finally{
-      hideLoader()
-    }
-}
-getImagesFunction(searchTextValue, page);
 
+    createGallery(hits);
+    loadedImages += hits.length;
+
+    if (loadedImages < totalHitsValue) {
+      showLoadMoreButton();
+    } else {
+      iziToast.info({
+        message: "We're sorry, but you've reached the end of results."
+      });
+    }
+
+  } catch (err) {
+    iziToast.error({ message: 'Please try again later' });
+    console.error(err);
+  } finally {
+    hideLoader();
+  }
 });
 
-  
+// --- LOAD MORE ---
+buttonLoadMore.addEventListener('click', async () => {
+  page++;
+  hideLoadMoreButton();
+  showLoader();
 
+  try {
+    const { hits } = await getImagesByQuery(searchTextValue, page);
 
+    createMoreGallery(hits);
+    smoothScroll();
+    loadedImages += hits.length;
 
-buttonLoadMore.addEventListener('click', ()=>{
+    if (loadedImages < totalHitsValue) {
+      showLoadMoreButton();
+    } else {
+      iziToast.info({
+        message: "We're sorry, but you've reached the end of results."
+      });
+    }
 
-  
-  hideLoadMoreButton()
-  showLoader()
-  searchTextValue = searchText.value.trim()
-  getImagesByQuery(searchTextValue, ++page)
-  .then(({hits, totalHits}) =>{
-    const totalPages = Math.ceil(totalHits / per_page) 
-    if (page >= totalPages){
-    iziToast.show({
-      message: 'Were sorry, but youve reached the end of search results.'
-    })
-    hideLoadMoreButton()
-    return
+  } catch (err) {
+    iziToast.error({ message: 'Please try again later' });
+    console.error(err);
+  } finally {
+    hideLoader();
   }
-    createMoreGallery(hits)
-    smoothScroll()
-    showLoadMoreButton()
-    
-    
-  })
-  .catch((error)=>{
-  console.error(error)
-})
-.finally(()=>{
-hideLoader()
-})
-})
-
-
+});
